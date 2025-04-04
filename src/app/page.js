@@ -1,103 +1,214 @@
-import Image from "next/image";
+"use client";
+
+import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
+import { useCart } from '@/context/CartContext'; // Import the CartContext
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [featuredAnimes, setFeaturedAnimes] = useState([]);
+  const [topRatedAnimes, setTopRatedAnimes] = useState([]);
+  const [randomAnimes, setRandomAnimes] = useState([]);
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+  const { addToFavorites } = useCart(); // Use the addToFavorites function
+  const carouselRef = useRef(null); // Reference to the carousel
+  const [isDarkMode, setIsDarkMode] = useState(false); // State for dark mode
+  const [favorites, setFavorites] = useState([]); // State to track favorite animes
+  const [showPopup, setShowPopup] = useState(false); // State for popup visibility
+  const [popupMessage, setPopupMessage] = useState(""); // State for popup message
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    const fetchAnimes = async () => {
+      const res = await fetch('https://api.jikan.moe/v4/anime', { cache: 'no-store' });
+      const data = await res.json();
+
+      // Fetch more anime for the carousel and featured sections
+      const shuffled = [...data.data].sort(() => 0.5 - Math.random()).slice(0, 30); // Increased to 30
+      const topRated = data.data.filter((anime) => anime.score >= 8).slice(0, 30); // Increased to 30
+
+      setFeaturedAnimes(data.data.slice(0, 30)); // Increased to 30
+      setTopRatedAnimes(topRated);
+      setRandomAnimes(shuffled);
+    };
+
+    fetchAnimes();
+  }, []);
+
+  // Shuffle the randomAnimes array whenever it changes
+  const shuffledAnimes = [...randomAnimes].sort(() => 0.5 - Math.random());
+
+  const filteredAnimes = shuffledAnimes.filter((anime) =>
+    anime.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (carouselRef.current) {
+        const maxScrollLeft = carouselRef.current.scrollWidth - carouselRef.current.clientWidth;
+        if (carouselRef.current.scrollLeft >= maxScrollLeft) {
+          carouselRef.current.scrollTo({ left: 0, behavior: "smooth" }); // Reset to the start
+        } else {
+          carouselRef.current.scrollBy({ left: 200, behavior: "smooth" }); // Scroll by 200px
+        }
+      }
+    }, 3000); // Scroll every 3 seconds
+
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, []);
+
+  const handleAddToFavorites = (anime) => {
+    addToFavorites(anime); // Add to favorites
+    setFavorites((prevFavorites) => [...prevFavorites, anime]); // Add anime to favorites
+    setPopupMessage(`${anime.title} ajouté aux favoris !`); // Set popup message
+    setShowPopup(true); // Show popup
+    setTimeout(() => setShowPopup(false), 2000); // Hide popup after 2 seconds
+  };
+
+  return (
+    <div
+      className="min-h-screen"
+      style={{
+        backgroundImage: isDarkMode
+          ? "url('https://media.istockphoto.com/id/945982522/fr/photo/explosion-de-poudre-de-couleurs-multi-abstraite-sur-fond-blanc-figer-le-mouvement-des.jpg?s=2048x2048&w=is&k=20&c=He3XCY9-jfdToVHFc29Lf57W53-OK-fChOp8kKyKzpE=')" // Dark mode background image
+          : "none", // No background image for light mode
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+        backgroundColor: isDarkMode ? "black" : "transparent", // Ensure a fallback color for dark mode
+      }}
+    >
+      {/* Popup Confirmation */}
+      {showPopup && (
+        <div className="fixed top-4 right-4 bg-gradient-to-r from-green-400 via-yellow-500 to-red-500 text-white p-4 rounded shadow-lg z-50">
+          {popupMessage}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+
+      {/* Search Bar */}
+      <section className="p-4">
+        <input
+          type="text"
+          placeholder="Rechercher un anime..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded bg-white dark:bg-gray-800 text-black dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gradient-to-r hover:from-blue-400 hover:via-purple-500 hover:to-pink-500 dark:hover:from-blue-800 dark:hover:via-purple-900 dark:hover:to-pink-800 transition-colors duration-300"
+        />
+      </section>
+
+      {/* Carrousel */}
+      <section className="flex items-center justify-center min-h-screen">
+        <div className="p-4 relative w-full max-w-5xl">
+          <h1 className="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400 shadow-lg text-center">
+            Best Anime
+          </h1>
+          <div className="relative">
+            {/* Carousel */}
+            <div
+              id="carousel"
+              ref={carouselRef} // Attach the ref to the carousel
+              className="flex overflow-x-scroll space-x-4 scrollbar-hide"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {filteredAnimes.map((anime) => (
+                <Link href={`/produits/${anime.mal_id}`} key={anime.mal_id}>
+                  <div
+                    className="min-w-[200px] bg-gradient-to-r from-blue-800 via-blue-900 to-black dark:from-gray-900 dark:via-gray-800 dark:to-black rounded shadow-2xl p-4 relative"
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault(); // Prevent navigation
+                        handleAddToFavorites(anime); // Handle add to favorites
+                      }}
+                      className={`absolute top-2 right-2 p-1 rounded-full shadow ${
+                        favorites.some((fav) => fav.mal_id === anime.mal_id)
+                          ? "bg-gradient-to-r from-green-400 via-yellow-500 to-red-500 text-white"
+                          : "bg-white dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      ⭐
+                    </button>
+                    <img
+                      src={anime.images.jpg.image_url}
+                      alt={anime.title}
+                      className="w-64 h-64 object-cover rounded"
+                    />
+                    <h3 className="text-lg font-semibold mt-2 text-black dark:text-white">{anime.title}</h3>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex justify-center mt-4 space-x-4">
+              <button
+                onClick={() => {
+                  const carousel = document.getElementById("carousel");
+                  if (carousel) {
+                    carousel.scrollBy({ left: -carousel.clientWidth, behavior: "smooth" });
+                  }
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-gray-800 via-purple-900 to-black text-white rounded hover:from-gray-700 hover:via-purple-800 hover:to-gray-900"
+              >
+                Précédent
+              </button>
+              <button
+                onClick={() => {
+                  const carousel = document.getElementById("carousel");
+                  if (carousel) {
+                    carousel.scrollBy({ left: carousel.clientWidth, behavior: "smooth" });
+                  }
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-gray-800 via-purple-900 to-black text-white rounded hover:from-gray-700 hover:via-purple-800 hover:to-gray-900"
+              >
+                Suivant
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section en avant */}
+      <section className="p-4">
+        <h1 className="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400 shadow-lg">
+          En Avant
+        </h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {featuredAnimes.map((anime) => (
+            <Link href={`/produits/${anime.mal_id}`} key={anime.mal_id}>
+              <div className="bg-gradient-to-r from-blue-800 via-blue-900 to-black dark:from-gray-900 dark:via-gray-800 dark:to-black rounded shadow-2xl p-4 relative">
+                <img
+                  src={anime.images.jpg.image_url}
+                  alt={anime.title}
+                  className="w-64 h-64 object-cover rounded"
+                />
+                <h3 className="text-lg font-semibold mt-2 text-black dark:text-white">{anime.title}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{anime.synopsis.substring(0, 100)}...</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Section bien notés */}
+      <section className="p-4">
+        <h1 className="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400 shadow-lg">
+          Produits Bien Notés
+        </h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {topRatedAnimes.map((anime) => (
+            <Link href={`/produits/${anime.mal_id}`} key={anime.mal_id}>
+              <div className="bg-gradient-to-r from-blue-800 via-blue-900 to-black dark:from-gray-900 dark:via-gray-800 dark:to-black rounded shadow-2xl p-4 relative">
+                <img
+                  src={anime.images.jpg.image_url}
+                  alt={anime.title}
+                  className="w-64 h-64 object-cover rounded"
+                />
+                <h3 className="text-lg font-semibold mt-2 text-black dark:text-white">{anime.title}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Score : {anime.score}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
